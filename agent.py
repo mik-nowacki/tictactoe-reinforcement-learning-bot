@@ -144,13 +144,13 @@ def train_ai():
                 break
 
             # Draw - end episode (after AI's episode)
-            if len(game.find_available_moves(new_state)) == 0:
+            if len(game.find_available_moves()) == 0:
                 agent.train_short_memory(old_state, action, DRAW, new_state, True)
                 draws+=1
                 game_logs[episode] = 0
                 break
 
-            r_row, r_col = random_player(game.find_available_moves(new_state))
+            r_row, r_col = random_player(game.find_available_moves())
             game.make_move(r_row, r_col)
             updated_state = agent.get_state(game)
             # Random player wins - end episode
@@ -161,7 +161,7 @@ def train_ai():
                 break
 
             # Draw - end episode (after player's move)
-            if len(game.find_available_moves(updated_state)) == 0:
+            if len(game.find_available_moves()) == 0:
                 agent.train_short_memory(old_state, action, DRAW, new_state, True)
                 draws+=1
                 game_logs[episode] = 0
