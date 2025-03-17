@@ -21,6 +21,7 @@ WIN = 10
 LOSS = -10 
 DRAW = 5
 ONGOING = 0
+INVALID_MOVE = -5
 
 
 class Agent():
@@ -31,6 +32,21 @@ class Agent():
         self.memory = deque(maxlen=MAX_MEMORY)
         self.model = Linear_QNet(input_size=9, hidden_size=256, output_size=9)
         self.trainer = QTrainer(self.model, LR, self.gamma)
+        self.model_name = "tic_tac_toe_model.pth"
+
+
+    def save_model(self):
+        torch.save(self.model.state_dict(), self.model_name)
+        print(f"Model saved to {self.model_name}")
+        
+
+    def load_model(self):
+        if os.path.exists(self.model_name):
+            self.model.load_state_dict(torch.load(self.model_name))
+            self.model.eval()
+            print(f"Loaded model from {self.model_name}")
+        else:
+            print(f"No saved model found at {self.model_name}")
 
 
     def get_state(self, game: TicTacToe) -> list:
@@ -46,24 +62,18 @@ class Agent():
 
     def get_action(self, state) -> tuple:
         # epsilon-greedy strategy
-        # current_board, available_moves = state
         self.epsilon = EPS_END + (EPS_START - EPS_END) * \
         math.exp(-1. * self.n_games / EPS_DECAY)
-        # self.epsilon = 100 * (0.95 ** self.n_games)  # 5% decay per episode
-        available_moves = self.find_available_moves(state)
+
         if random.choice(range(0, 100)) < self.epsilon:
             # random move (exploration)
-            return random.choice(available_moves)
-
-        # use a model to predict (exploitation)
-        board_tensor = torch.tensor(state.flatten(), dtype=torch.float32)
-        Q = self.model(board_tensor)
-        Q = Q.detach().numpy()
-        for i in range(9):
-            if (i // 3, i % 3) not in available_moves:
-                Q[i] = -float('inf')
-
-        best_move_index = np.argmax(Q)
+            best_move_index = random.randint(0,8)
+        else:
+            # use a model to predict (exploitation)
+            board_tensor = torch.tensor(state.flatten(), dtype=torch.float32)
+            Q = self.model(board_tensor)
+            Q = Q.detach().numpy()
+            best_move_index = np.argmax(Q)
 
         return tuple((best_move_index // 3, best_move_index % 3))
     
@@ -75,18 +85,15 @@ class Agent():
     def train_short_memory(self, old_state, action, reward, new_state, is_terminal):
         action_index = action[0] * 3 + action[1]
         # Wrap available moves in a list to match batch format
-        available_moves = [self.find_available_moves(old_state)]  # Note extra []
+        self.remember(old_state, action_index, reward, new_state, is_terminal)
         self.trainer.train_step(
             [old_state],  # Wrap state in list
-            available_moves,
             [action_index],  # Wrap action in list
             [reward],  # Wrap reward in list
             [new_state],  # Wrap new_state in list
             [is_terminal]  # Wrap terminal flag in list
         )
-        self.remember(old_state, action_index, reward, new_state, is_terminal)
 
-        
 
     def train_long_memory(self):
         if len(self.memory) > BATCH_SIZE:
@@ -95,8 +102,7 @@ class Agent():
             sample = self.memory
 
         states, actions, rewards, next_states, is_terminals = zip(*sample)
-        available_moves_per_state = [self.find_available_moves(state) for state in states]
-        self.trainer.train_step(states, available_moves_per_state, actions, rewards, next_states, is_terminals)
+        self.trainer.train_step(states, actions, rewards, next_states, is_terminals)
 
 
 
@@ -105,7 +111,7 @@ def random_player(available_moves):
 
 
 
-def train():
+def train_ai():
     game = TicTacToe()
     agent = Agent()
     AI = PLAYER
@@ -122,13 +128,24 @@ def train():
         while True:
             # AI Turn
             old_state = agent.get_state(game)
-            action = agent.get_action(old_state)
-            game.make_move(row=action[0], col=action[1])
-            new_state = agent.get_state(game)
 
+            # Valid move check
+            while True:  # this or p.4?
+                action = agent.get_action(old_state)
+                row, col = action
+            
+                # Check move validity
+                if (row, col) in game.find_available_moves():
+                    # Valid move
+                    game.make_move(row, col)
+                    new_state = agent.get_state(game)
+                    break
+                else:
+                    # Invalid move punishment
+                    agent.train_short_memory(old_state, action, INVALID_MOVE, old_state, False)
+            
             # AI wins - end episode
             if game.check_winner() == AI:
-                agent.remember(old_state, action, WIN, new_state, True)
                 agent.train_short_memory(old_state, action, WIN, new_state, True)
                 ai_wins+=1
                 game_logs[episode] = 1
@@ -136,7 +153,6 @@ def train():
 
             # Draw - end episode (after AI's episode)
             if len(agent.find_available_moves(new_state)) == 0:
-                agent.remember(old_state, action, DRAW, new_state, True)
                 agent.train_short_memory(old_state, action, DRAW, new_state, True)
                 draws+=1
                 game_logs[episode] = 0
@@ -147,23 +163,19 @@ def train():
             updated_state = agent.get_state(game)
             # Random player wins - end episode
             if game.check_winner() == RANDOM:
-                agent.remember(old_state, action, LOSS, new_state, True)
+                agent.train_short_memory(old_state, action, LOSS, new_state, True)
                 random_wins += 1
                 game_logs[episode] = -1
                 break
 
             # Draw - end episode (after player's move)
             if len(agent.find_available_moves(updated_state)) == 0:
-                agent.remember(old_state, action, DRAW, new_state, True)
                 agent.train_short_memory(old_state, action, DRAW, new_state, True)
                 draws+=1
                 game_logs[episode] = 0
                 break
 
-            # agent.remember(old_state, action, ONGOING, updated_state, False)
-            # agent.train_short_memory(old_state, action, ONGOING, updated_state, False)
             agent.train_short_memory(old_state, action, ONGOING, new_state, False)
-
 
         agent.n_games+=1
         agent.train_long_memory()
@@ -181,16 +193,6 @@ def train():
         win_logs.append(counter[1])
         draw_logs.append(counter[0])
         loss_logs.append(counter[-1])
-        
-    # Plotting the results
-    # plt.figure(figsize=(10, 6))
-    # plt.scatter(range(len(game_logs)),game_logs, s=50, alpha=0.5)
-    # plt.title("AI Learning Progress Over Time")
-    # plt.xlabel("Episode")
-    # plt.yticks(ticks=[-1, 0, 1], labels=['Loss', 'Draw', 'Win'])
-    # plt.ylabel("Result")
-    # plt.grid(True)
-    # plt.show()
 
     # Plotting the results
     plt.figure(figsize=(10, 6))
@@ -199,7 +201,6 @@ def train():
     plt.plot(range(0, len(game_logs), 50), loss_logs, label="Losses")
     plt.title("AI Learning Progress Over Time")
     plt.xlabel("Episode")
-    # plt.yticks(ticks=[-1, 0, 1], labels=['Loss', 'Draw', 'Win'])
     plt.ylabel("Result")
     plt.legend()
     plt.grid(True)
@@ -222,33 +223,109 @@ def train():
     plt.plot(range(0, len(game_logs), 50), loss_logs, label="Losses")
     plt.title("AI Learning Progress Over Time")
     plt.xlabel("Episode")
-    # plt.yticks(ticks=[-1, 0, 1], labels=['Loss', 'Draw', 'Win'])
     plt.ylabel("Result")
     plt.legend()
     plt.grid(True)
     plt.show()
 
+    agent.save_model()
+    return agent
+
+def ai_starts(game: TicTacToe, ai: Agent):
+    print("The game starts now! Type 'q q' to quit...")
+    while True:
+        # AI's move
+        state = ai.get_state(game)
+        # Valid move check
+        while True:  # this or p.4?
+            action = ai.get_action(state)
+            row, col = action
+        
+            available_moves = game.find_available_moves()
+            # Check move validity
+            if (row, col) in available_moves:
+                # Valid move
+                game.make_move(row, col)
+                break
+            elif len(available_moves) == 0:
+                # no moves left - terminal state
+                break
+        if len(game.find_available_moves()) == 0:
+            print("It's a draw!")
+            game.print_board()
+            game.reset()
+            continue
+        
+        # Player's move
+        game.print_board()
+        row, col = input("Make a move!").split()
+        if row == 'q' or col == 'q':
+            break
+        game.make_move(int(row), int(col))
+
+        if game.check_winner() is not None:
+            print("We have a winner!")
+            game.print_board()
+            game.reset()
+        elif len(game.find_available_moves()) == 0:
+            print("It's a draw!")
+            game.print_board()
+            game.reset()
 
 
-# def play():
-#     game = TicTacToe()
-#     print("The game starts now! Type 'q q' to quit...")
-#     game.print_board()
-#     while True:
-#         row, col = input("Make a move!").split()
-#         if row == 'q' or col == 'q':
-#             break
-#         game.make_move(int(row), int(col))
-#         game.print_board()
+def player_starts(game: TicTacToe, ai: Agent):
+    print("The game starts now! Type 'q q' to quit...")
+    while True:
+        # Player's move
+        game.print_board()
+        row, col = input("Make a move!").split()
+        if row == 'q' or col == 'q':
+            break
+        game.make_move(int(row), int(col))
 
-#         if winner := game.check_winner() is not None:
-#             print(f"{SYMBOLS[winner]} wins!")
-#             break
-#         elif len(game.find_available_moves()) == 0:
-#             print("It's a draw!")
-#             break
+        # AI's move
+        state = ai.get_state(game)
+        # Valid move check
+        while True:  # this or p.4?
+            action = ai.get_action(state)
+            row, col = action
+        
+            available_moves = game.find_available_moves()
+            # Check move validity
+            if (row, col) in available_moves:
+                # Valid move
+                game.make_move(row, col)
+                break
+            elif len(available_moves) == 0:
+                # no moves left - terminal state
+                break
 
+        if game.check_winner() is not None:
+            print("We have a winner!")
+            game.print_board()
+            game.reset()
+        elif len(game.find_available_moves()) == 0:
+            print("It's a draw!")
+            game.print_board()
+            game.reset()
+
+
+def play(if_player_starts):
+    game = TicTacToe()
+    ai = Agent()
+    ai.load_model()
+    if not os.path.exists(ai.model_name):
+        print("No trained model found, training new one...")
+        ai = train_ai()
+        ai.save_model()
+    if if_player_starts.lower() == "yes":
+        player_starts(game, ai)
+    elif if_player_starts.lower() == "no":
+        ai_starts(game, ai)
+    else:
+        print("Invalid input, bye!")
+    
+            
 
 if __name__ == '__main__':
-        train()
-        # play()
+    play(input("Do you want to start? (yes/no): "))

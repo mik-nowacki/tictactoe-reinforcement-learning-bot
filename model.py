@@ -26,7 +26,8 @@ class QTrainer:
         self.optimizer = optim.Adam(model.parameters(), lr=self.lr)
         self.criterion = nn.MSELoss()
 
-    def train_step(self, states, available_moves, actions, rewards, next_states, is_terminals):
+
+    def train_step(self, states, actions, rewards, next_states, is_terminals):
         # Convert to tensors with proper batch dimensions
         states = torch.tensor(np.array(states).reshape(-1, 9)).float()
         next_states = torch.tensor(np.array(next_states).reshape(-1, 9)).float()
@@ -39,20 +40,8 @@ class QTrainer:
 
         # 2. Calculate target Q values
         with torch.no_grad():
-            next_q = self.model(next_states)
-            
-            # Mask invalid moves by setting their Q values to -inf
-            for i, moves in enumerate(available_moves):
-                # Convert (row,col) moves to indices
-                valid_indices = [row*3 + col for (row, col) in moves]
-                mask = torch.ones(9, dtype=torch.bool)
-                for idx in range(9):
-                    if idx not in valid_indices:
-                        mask[idx] = False
-                next_q[i][mask] = -float('inf')
-
-            max_next_q = next_q.max(1)[0].view(-1, 1)  # Shape: [batch_size, 1]
-            target_q = rewards + (self.gamma * max_next_q * ~is_terminals.view(-1, 1))
+            next_q = self.model(next_states).max(1)[0].view(-1,1)
+            target_q = rewards + (self.gamma * next_q * ~is_terminals)
 
         # 3. Compute loss
         loss = self.criterion(current_q, target_q)
