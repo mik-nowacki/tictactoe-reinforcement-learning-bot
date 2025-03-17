@@ -14,7 +14,7 @@ class Linear_QNet(nn.Module):
     def forward(self, x):
         x = F.relu(self.fc1(x))
         x = self.fc2(x)
-        x = self.fc3(x)  # No activation, since we want raw Q-values
+        x = self.fc3(x)
         return x
 
 
@@ -31,12 +31,12 @@ class QTrainer:
         # Convert to tensors with proper batch dimensions
         states = torch.tensor(np.array(states).reshape(-1, 9)).float()
         next_states = torch.tensor(np.array(next_states).reshape(-1, 9)).float()
-        actions = torch.tensor(actions).long().view(-1, 1)  # Shape: [batch_size, 1]
-        rewards = torch.tensor(rewards).float().view(-1, 1)  # Shape: [batch_size, 1]
+        actions = torch.tensor(actions).long().view(-1, 1)
+        rewards = torch.tensor(rewards).float().view(-1, 1)
         is_terminals = torch.tensor(is_terminals).bool()
 
         # 1. Get current Q values for chosen actions
-        current_q = self.model(states).gather(1, actions)  # Shape: [batch_size, 1]
+        current_q = self.model(states).gather(1, actions)
 
         # 2. Calculate target Q values
         with torch.no_grad():

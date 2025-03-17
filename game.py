@@ -44,7 +44,3 @@ class TicTacToe():
             if np.all(np.diag(self.board) == p) or np.all(np.diag(np.fliplr(self.board)) == p):
                 return p
         return None
-
-
-    # def is_valid_move(self, row: int, col: int) -> bool:
-    #     return (row, col) in self.find_available_moves()

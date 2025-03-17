@@ -52,18 +52,12 @@ class Agent():
     def get_state(self, game: TicTacToe) -> list:
         state = game.board.copy()
         return state
-
-
-    def find_available_moves(self, state) -> list:
-        # Ensure 2D board format
-        board = state.reshape(3, 3) if state.size == 9 else state
-        return list(zip(*np.where(board == EMPTY)))
     
 
     def get_action(self, state) -> tuple:
         # epsilon-greedy strategy
         self.epsilon = EPS_END + (EPS_START - EPS_END) * \
-        math.exp(-1. * self.n_games / EPS_DECAY)
+        math.exp(-1. * self.n_games / EPS_DECAY)  # exponential decay
 
         if random.choice(range(0, 100)) < self.epsilon:
             # random move (exploration)
@@ -84,15 +78,13 @@ class Agent():
 
     def train_short_memory(self, old_state, action, reward, new_state, is_terminal):
         action_index = action[0] * 3 + action[1]
-        # Wrap available moves in a list to match batch format
         self.remember(old_state, action_index, reward, new_state, is_terminal)
         self.trainer.train_step(
-            [old_state],  # Wrap state in list
-            [action_index],  # Wrap action in list
-            [reward],  # Wrap reward in list
-            [new_state],  # Wrap new_state in list
-            [is_terminal]  # Wrap terminal flag in list
-        )
+            [old_state],
+            [action_index],
+            [reward],
+            [new_state],
+            [is_terminal])
 
 
     def train_long_memory(self):
@@ -130,7 +122,7 @@ def train_ai():
             old_state = agent.get_state(game)
 
             # Valid move check
-            while True:  # this or p.4?
+            while True:
                 action = agent.get_action(old_state)
                 row, col = action
             
@@ -152,13 +144,13 @@ def train_ai():
                 break
 
             # Draw - end episode (after AI's episode)
-            if len(agent.find_available_moves(new_state)) == 0:
+            if len(game.find_available_moves(new_state)) == 0:
                 agent.train_short_memory(old_state, action, DRAW, new_state, True)
                 draws+=1
                 game_logs[episode] = 0
                 break
 
-            r_row, r_col = random_player(agent.find_available_moves(new_state))
+            r_row, r_col = random_player(game.find_available_moves(new_state))
             game.make_move(r_row, r_col)
             updated_state = agent.get_state(game)
             # Random player wins - end episode
@@ -169,7 +161,7 @@ def train_ai():
                 break
 
             # Draw - end episode (after player's move)
-            if len(agent.find_available_moves(updated_state)) == 0:
+            if len(game.find_available_moves(updated_state)) == 0:
                 agent.train_short_memory(old_state, action, DRAW, new_state, True)
                 draws+=1
                 game_logs[episode] = 0
@@ -231,13 +223,14 @@ def train_ai():
     agent.save_model()
     return agent
 
+
 def ai_starts(game: TicTacToe, ai: Agent):
     print("The game starts now! Type 'q q' to quit...")
     while True:
         # AI's move
         state = ai.get_state(game)
         # Valid move check
-        while True:  # this or p.4?
+        while True:
             action = ai.get_action(state)
             row, col = action
         
@@ -250,6 +243,7 @@ def ai_starts(game: TicTacToe, ai: Agent):
             elif len(available_moves) == 0:
                 # no moves left - terminal state
                 break
+
         if len(game.find_available_moves()) == 0:
             print("It's a draw!")
             game.print_board()
@@ -286,7 +280,7 @@ def player_starts(game: TicTacToe, ai: Agent):
         # AI's move
         state = ai.get_state(game)
         # Valid move check
-        while True:  # this or p.4?
+        while True:
             action = ai.get_action(state)
             row, col = action
         
