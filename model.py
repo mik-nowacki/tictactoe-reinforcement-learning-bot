@@ -41,7 +41,7 @@ class QTrainer:
         # 2. Calculate target Q values
         with torch.no_grad():
             next_q = self.model(next_states).max(1)[0].view(-1,1)
-            target_q = rewards + (self.gamma * next_q * ~is_terminals)
+            target_q = rewards + (self.gamma * next_q * ~is_terminals)  # ~is_terminals prevets terminal states from being included into possible future rewards
 
         # 3. Compute loss
         loss = self.criterion(current_q, target_q)

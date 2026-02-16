@@ -11,10 +11,10 @@ import math
 MAX_MEMORY = 10_000
 BATCH_SIZE = 100
 LR = 0.001  # learning rate
-N_EPISODES = 10_000
+N_EPISODES = 1000
 EPS_START = 0.9
 EPS_END = 0.05
-EPS_DECAY = 2000
+EPS_DECAY = N_EPISODES/5
 
 # rewards
 WIN = 10
@@ -132,20 +132,20 @@ def train_ai():
                     game.make_move(row, col)
                     new_state = agent.get_state(game)
                     break
-                else:
-                    # Invalid move punishment
-                    agent.train_short_memory(old_state, action, INVALID_MOVE, old_state, False)
+                # else:
+                    # # Invalid move punishment
+                    # agent.train_short_memory(old_state, action, INVALID_MOVE, old_state, False)
             
             # AI wins - end episode
             if game.check_winner() == AI:
-                agent.train_short_memory(old_state, action, WIN, new_state, True)
+                # agent.train_short_memory(old_state, action, WIN, new_state, True)
                 ai_wins+=1
                 game_logs[episode] = 1
                 break
 
             # Draw - end episode (after AI's episode)
             if len(game.find_available_moves()) == 0:
-                agent.train_short_memory(old_state, action, DRAW, new_state, True)
+                # agent.train_short_memory(old_state, action, DRAW, new_state, True)
                 draws+=1
                 game_logs[episode] = 0
                 break
@@ -155,22 +155,22 @@ def train_ai():
             updated_state = agent.get_state(game)
             # Random player wins - end episode
             if game.check_winner() == RANDOM:
-                agent.train_short_memory(old_state, action, LOSS, new_state, True)
+                # agent.train_short_memory(old_state, action, LOSS, new_state, True)
                 random_wins += 1
                 game_logs[episode] = -1
                 break
 
             # Draw - end episode (after player's move)
             if len(game.find_available_moves()) == 0:
-                agent.train_short_memory(old_state, action, DRAW, new_state, True)
+                # agent.train_short_memory(old_state, action, DRAW, new_state, True)
                 draws+=1
                 game_logs[episode] = 0
                 break
 
-            agent.train_short_memory(old_state, action, ONGOING, new_state, False)
+            # agent.train_short_memory(old_state, action, ONGOING, new_state, False)
 
         agent.n_games+=1
-        agent.train_long_memory()
+        # agent.train_long_memory()
     
     print("AI wins: ", ai_wins)
     print("Random_player wins: ", random_wins)
